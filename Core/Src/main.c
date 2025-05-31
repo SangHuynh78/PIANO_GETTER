@@ -130,7 +130,7 @@ int main(void)
 	  LL_mDelay(10);
 
 	  if (key_state != 0) {
-		  snprintf(buffer, sizeof(buffer), "%x  ", key_state);
+		  snprintf(buffer, sizeof(buffer), "0x%02x  ", key_state);
 		  UART1_LL_SendString(buffer);
 	  }
 
@@ -141,7 +141,7 @@ int main(void)
 	  if (!LL_GPIO_IsInputPinSet(SW1_GPIO_Port, SW1_Pin)) {
 		  uint32_t Flash_ID = GD25Q16E_ReadID(&flash);
 
-		  snprintf(buffer, sizeof(buffer), "Flasd ID: 0x%06X \r\n", (unsigned int)Flash_ID);
+		  snprintf(buffer, sizeof(buffer), "Flash ID: 0x%06X \r\n", (unsigned int)Flash_ID);
 		  UART1_LL_SendString(buffer);
 	  }
 	  if (!LL_GPIO_IsInputPinSet(SW2_GPIO_Port, SW2_Pin)) {
