@@ -1,0 +1,2 @@
+../Dev/SONG/song.c:16:6:song_erase	24	static
+../Dev/SONG/song.c:23:6:song_write	24	static

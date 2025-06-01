@@ -1,4 +1,5 @@
-Dev/FLASH/gd25q16e.o: ../Dev/FLASH/gd25q16e.c ../Dev/FLASH/gd25q16e.h \
+Dev/SONG/song.o: ../Dev/SONG/song.c ../Dev/SONG/song.h \
+ ../Dev/SONG/song_map.h D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h \
  ../Core/Inc/main.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_rcc.h \
  ../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f1xx.h \
@@ -18,9 +19,10 @@ Dev/FLASH/gd25q16e.o: ../Dev/FLASH/gd25q16e.c ../Dev/FLASH/gd25q16e.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_spi.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_tim.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_usart.h \
- ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h \
- D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h
-../Dev/FLASH/gd25q16e.h:
+ ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h
+../Dev/SONG/song.h:
+../Dev/SONG/song_map.h:
+D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_rcc.h:
 ../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f1xx.h:
@@ -41,4 +43,3 @@ Dev/FLASH/gd25q16e.o: ../Dev/FLASH/gd25q16e.c ../Dev/FLASH/gd25q16e.h \
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_tim.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_usart.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h:
-D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h:

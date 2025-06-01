@@ -23,9 +23,12 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include "gd25q16e.h"
 #include "ttp229.h"
 #include "uart.h"
+#include "song.h"
+
 
 /* USER CODE END Includes */
 
@@ -56,18 +59,210 @@ static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+typedef enum {
+    STATE_IDLE,
+    STATE_WAIT_SW2_RELEASE,
+    STATE_RECORD,
+    STATE_UART_WAIT_SEND,
+    STATE_UART_SENDING,
+    STATE_WAIT_ERASE
+} State_t;
 
-GD25Q16E_Dev_t flash = {
+struct GD25Q16E_Dev flash = {
 	.spi = SPI1,
-	.cs_port = GPIOA,
-	.cs_pin = LL_GPIO_PIN_4
+	.cs_port = FL_CS_GPIO_Port,
+	.cs_pin = FL_CS_Pin
 };
+
+#define FLASH_END_ADDR				0x06DFFF
+#define UART_CHUNK_SIZE				100
+#define LED_TOGGLE_TICKS			50
+#define DEBOUNCE_TICKS				5
+
+static State_t current_state = STATE_IDLE;
+static uint32_t sample_count = 0;
+static uint32_t sw1_hold_time = 0;
+static uint32_t sw2_hold_time = 0;
+static uint32_t sw1_debounce = 0;
+static uint32_t sw2_debounce = 0;
+static bool sw1_state = false;
+static bool sw2_state = false;
+static uint32_t uart_wait_delay = 0;
+static uint32_t erase_wait_delay = 0;
+volatile uint32_t timer_count = 0;
+static uint32_t flash_addr = 0;
+static uint32_t led_toggle_count = 0;
+
+
+void UART_Transmit_Flash(uint32_t start_addr, uint32_t len) {
+    uint8_t buffer[UART_CHUNK_SIZE];
+    uint32_t remaining = len - (flash_addr - start_addr);
+    uint32_t chunk = (remaining > UART_CHUNK_SIZE) ? UART_CHUNK_SIZE : remaining;
+
+    if (chunk > 0) {
+        GD25Q16E_Read(&flash, flash_addr, buffer, chunk);
+        for (uint32_t i = 0; i < chunk; i++) {
+            while (!LL_USART_IsActiveFlag_TXE(USART1));
+            LL_USART_TransmitData8(USART1, buffer[i]);
+        }
+        flash_addr += chunk;
+    }
+}
+
+void EraseAllFlash(void) {
+    for (uint32_t addr = 0x000000; addr <= FLASH_END_ADDR; addr += 4096) {
+        GD25Q16E_EraseSector(&flash, addr);
+        // Chớp LED đỏ
+        LL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
+        LL_mDelay(50); // Đợi ngắn để chớp LED
+    }
+}
+
+void Timer2_10ms_handle(void) {
+    if (LL_TIM_IsActiveFlag_UPDATE(TIM2)) {
+        LL_TIM_ClearFlag_UPDATE(TIM2);
+        timer_count++;
+        led_toggle_count++;
+
+        // Debouncing SW1
+        bool sw1_current = !LL_GPIO_IsInputPinSet(SW1_GPIO_Port, SW1_Pin);
+        if (sw1_current == sw1_state) {
+            sw1_debounce = 0;
+        } else {
+            sw1_debounce++;
+            if (sw1_debounce >= DEBOUNCE_TICKS) {
+                sw1_state = sw1_current;
+                sw1_debounce = 0;
+                if (!sw1_state) {
+                    sw1_hold_time = 0;
+                }
+            }
+        }
+        if (sw1_state) {
+            sw1_hold_time++;
+        }
+
+        // Debouncing SW2
+        bool sw2_current = !LL_GPIO_IsInputPinSet(SW2_GPIO_Port, SW2_Pin);
+        if (sw2_current == sw2_state) {
+            sw2_debounce = 0;
+        } else {
+            sw2_debounce++;
+            if (sw2_debounce >= DEBOUNCE_TICKS) {
+                sw2_state = sw2_current;
+                sw2_debounce = 0;
+                if (!sw2_state) {
+                    sw2_hold_time = 0;
+                }
+            }
+        }
+        if (sw2_state) {
+            sw2_hold_time++;
+        }
+
+        // Nhấp nháy LED trong UART_SENDING và WAIT_ERASE
+        if ((current_state == STATE_UART_SENDING || current_state == STATE_WAIT_ERASE) && led_toggle_count >= LED_TOGGLE_TICKS) {
+            if (current_state == STATE_UART_SENDING) {
+                LL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+            } else {
+                LL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
+                LL_GPIO_TogglePin(LED_G_GPIO_Port, LED_G_Pin);
+                LL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+            }
+            led_toggle_count = 0;
+        }
+
+        // Xử lý trạng thái
+        switch (current_state) {
+            case STATE_IDLE:
+                LL_GPIO_SetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
+                LL_GPIO_ResetOutputPin(LED_G_GPIO_Port, LED_G_Pin);
+                LL_GPIO_ResetOutputPin(LED_B_GPIO_Port, LED_B_Pin);
+                if (sw2_hold_time == 1) {
+                    current_state = STATE_WAIT_SW2_RELEASE;
+                    sw2_debounce = 0;
+                    sw2_state = true;
+                } else if (sw1_hold_time >= 500) { // 5 giây
+                    current_state = STATE_WAIT_ERASE;
+                	LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
+                    sw1_hold_time = 0;
+                    erase_wait_delay = 0;
+                }
+                break;
+
+            case STATE_WAIT_SW2_RELEASE:
+                if (sw2_hold_time >= 300) {
+                    current_state = STATE_UART_WAIT_SEND;
+                    sw2_hold_time = 0;
+                    uart_wait_delay = 0;
+                } else if (sw2_hold_time == 0) {
+                    current_state = STATE_RECORD;
+                    sample_count = 0;
+                }
+                break;
+
+            case STATE_RECORD:
+                LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
+                LL_GPIO_SetOutputPin(LED_G_GPIO_Port, LED_G_Pin);
+                LL_GPIO_ResetOutputPin(LED_B_GPIO_Port, LED_B_Pin);
+                if (sw1_hold_time == 1 || sample_count >= SONG_DATA_SIZE_LONG) {
+                    char name[16];
+                    memset(song_name, 0xFF, SONG_NAME_SIZE);
+                    snprintf(name, sizeof(name), "Bai so %lu", song_index + 1);
+                    memcpy(song_name, name, strlen(name) + 1);
+                    song_write(&flash, song_index);
+                    song_index = (song_index + 1) % SONG_COUNT;
+                    current_state = STATE_IDLE;
+                } else {
+                    if (sample_count < SONG_DATA_SIZE_LONG) {
+                        song_data[sample_count] = TTP229_Read_8Keys();
+                        sample_count++;
+                    }
+                }
+                break;
+
+            case STATE_UART_WAIT_SEND:
+                LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
+                LL_GPIO_ResetOutputPin(LED_G_GPIO_Port, LED_G_Pin);
+                LL_GPIO_SetOutputPin(LED_B_GPIO_Port, LED_B_Pin);
+                uart_wait_delay++;
+                if (uart_wait_delay >= 50 && sw2_hold_time == 1) {
+                    current_state = STATE_UART_SENDING;
+                    flash_addr = 0x000000;
+                    led_toggle_count = 0;
+                } else if (uart_wait_delay >= 50 && sw1_hold_time == 1) {
+                	current_state = STATE_IDLE;
+                }
+
+                break;
+
+            case STATE_UART_SENDING:
+                UART_Transmit_Flash(0x000000, FLASH_END_ADDR + 1);
+                if (flash_addr > FLASH_END_ADDR) {
+                    current_state = STATE_IDLE;
+                }
+                break;
+
+            case STATE_WAIT_ERASE:
+                erase_wait_delay++;
+                if (erase_wait_delay >= 50 && sw2_state && sw2_hold_time == 1) {
+                    EraseAllFlash();
+                    current_state = STATE_IDLE;
+                } else if (erase_wait_delay >= 50 && sw1_state && sw1_hold_time == 1) {
+                    current_state = STATE_IDLE;
+                }
+                break;
+        }
+    }
+}
+
 
 /* USER CODE END 0 */
 
@@ -106,6 +301,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  GD25Q16E_Init(&flash);
 
   /* USER CODE END SysInit */
 
@@ -114,53 +310,56 @@ int main(void)
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_TIM4_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  GD25Q16E_Init(&flash);
+
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint8_t key_state = 0;
-  char buffer[100];
+//  uint8_t key_state = 0;
+//  char buffer[100];
   while (1)
   {
 
-	  key_state = TTP229_Read_8Keys();
-	  LL_mDelay(10);
-
-	  if (key_state != 0) {
-		  snprintf(buffer, sizeof(buffer), "0x%02x  ", key_state);
-		  UART1_LL_SendString(buffer);
-	  }
-
-	  LL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
-	  LL_GPIO_TogglePin(LED_G_GPIO_Port, LED_G_Pin);
-	  LL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
-
-	  if (!LL_GPIO_IsInputPinSet(SW1_GPIO_Port, SW1_Pin)) {
-		  uint32_t Flash_ID = GD25Q16E_ReadID(&flash);
-
-		  snprintf(buffer, sizeof(buffer), "Flash ID: 0x%06X \r\n", (unsigned int)Flash_ID);
-		  UART1_LL_SendString(buffer);
-	  }
-	  if (!LL_GPIO_IsInputPinSet(SW2_GPIO_Port, SW2_Pin)) {
-		  /* Write data to flash */
-		  uint8_t write_data[] = "Hello, Sang!";
-		  uint32_t write_addr = 0x000000; // Start at address 0
-		  snprintf(buffer, sizeof(buffer), "Writing data to address 0x%06X: %s\r\n", (unsigned int)write_addr, write_data);
-		  UART1_LL_SendString(buffer);
-		  GD25Q16E_Write(&flash, write_addr, write_data, strlen((char*)write_data) + 1);
-
-		  /* Read data back */
-		  uint8_t read_data[32] = {0};
-		  snprintf(buffer, sizeof(buffer), "Reading data from address 0x%06X...\r\n", (unsigned int)write_addr);
-		  UART1_LL_SendString(buffer);
-		  GD25Q16E_Read(&flash, write_addr, read_data, strlen((char*)write_data) + 1);
-		  snprintf(buffer, sizeof(buffer), "Data read: %s\r\n", read_data);
-		  UART1_LL_SendString(buffer);
-
-	  }
+//	  key_state = TTP229_Read_8Keys();
+//	  LL_mDelay(10);
+//
+//	  if (key_state != 0) {
+//		  snprintf(buffer, sizeof(buffer), "0x%02x  ", key_state);
+//		  UART1_LL_SendString(buffer);
+//	  }
+//
+//	  LL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
+//	  LL_GPIO_TogglePin(LED_G_GPIO_Port, LED_G_Pin);
+//	  LL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+//
+//	  if (!LL_GPIO_IsInputPinSet(SW1_GPIO_Port, SW1_Pin)) {
+//		  uint32_t Flash_ID = GD25Q16E_ReadID(&flash);
+//
+//		  snprintf(buffer, sizeof(buffer), "Flash ID: 0x%06X \r\n", (unsigned int)Flash_ID);
+//		  UART1_LL_SendString(buffer);
+//	  }
+//	  if (!LL_GPIO_IsInputPinSet(SW2_GPIO_Port, SW2_Pin)) {
+//		  /* Write data to flash */
+//		  uint8_t write_data[] = "Hello, Sang!";
+//		  uint32_t write_addr = 0x000000; // Start at address 0
+//		  snprintf(buffer, sizeof(buffer), "Writing data to address 0x%06X: %s\r\n", (unsigned int)write_addr, write_data);
+//		  UART1_LL_SendString(buffer);
+//		  GD25Q16E_Write(&flash, write_addr, write_data, strlen((char*)write_data) + 1);
+//
+//		  //song_erase(0);
+//
+//		  /* Read data back */
+//		  uint8_t read_data[32] = {0};
+//		  snprintf(buffer, sizeof(buffer), "Reading data from address 0x%06X...\r\n", (unsigned int)write_addr);
+//		  UART1_LL_SendString(buffer);
+//		  GD25Q16E_Read(&flash, write_addr, read_data, strlen((char*)write_data) + 1);
+//		  snprintf(buffer, sizeof(buffer), "Data read: %s\r\n", read_data);
+//		  UART1_LL_SendString(buffer);
+//
+//	  }
 
     /* USER CODE END WHILE */
 
@@ -234,15 +433,15 @@ static void MX_SPI1_Init(void)
   PA6   ------> SPI1_MISO
   PA7   ------> SPI1_MOSI
   */
-  GPIO_InitStruct.Pin = LL_GPIO_PIN_5|LL_GPIO_PIN_7;
+  GPIO_InitStruct.Pin = FL_SCK_Pin|FL_MOSI_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
   GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  GPIO_InitStruct.Pin = LL_GPIO_PIN_6;
+  GPIO_InitStruct.Pin = FL_MISO_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_FLOATING;
-  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  LL_GPIO_Init(FL_MISO_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN SPI1_Init 1 */
 
@@ -262,6 +461,48 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
   LL_SPI_Enable(SPI1);
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  LL_TIM_InitTypeDef TIM_InitStruct = {0};
+
+  /* Peripheral clock enable */
+  LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM2);
+
+  /* TIM2 interrupt Init */
+  NVIC_SetPriority(TIM2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_EnableIRQ(TIM2_IRQn);
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  TIM_InitStruct.Prescaler = 239;
+  TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
+  TIM_InitStruct.Autoreload = 999;
+  TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
+  LL_TIM_Init(TIM2, &TIM_InitStruct);
+  LL_TIM_EnableARRPreload(TIM2);
+  LL_TIM_SetClockSource(TIM2, LL_TIM_CLOCKSOURCE_INTERNAL);
+  LL_TIM_SetTriggerOutput(TIM2, LL_TIM_TRGO_RESET);
+  LL_TIM_DisableMasterSlaveMode(TIM2);
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  LL_TIM_EnableIT_UPDATE(TIM2); // Bật ngắt Update
+  LL_TIM_EnableCounter(TIM2);   // Khởi động timer
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -371,20 +612,20 @@ static void MX_GPIO_Init(void)
   LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOC);
 
   /**/
-  LL_GPIO_ResetOutputPin(SPI1_CS_GPIO_Port, SPI1_CS_Pin);
+  LL_GPIO_ResetOutputPin(FL_CS_GPIO_Port, FL_CS_Pin);
 
   /**/
   LL_GPIO_ResetOutputPin(TTP_CLK_GPIO_Port, TTP_CLK_Pin);
 
   /**/
-  LL_GPIO_ResetOutputPin(GPIOC, LED_R_Pin|LED_G_Pin|LED_B_Pin);
+  LL_GPIO_ResetOutputPin(GPIOC, LED_B_Pin|LED_G_Pin|LED_R_Pin);
 
   /**/
-  GPIO_InitStruct.Pin = SPI1_CS_Pin;
+  GPIO_InitStruct.Pin = FL_CS_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
   GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  LL_GPIO_Init(SPI1_CS_GPIO_Port, &GPIO_InitStruct);
+  LL_GPIO_Init(FL_CS_GPIO_Port, &GPIO_InitStruct);
 
   /**/
   GPIO_InitStruct.Pin = SW2_Pin|TTP_SDO_Pin;
@@ -399,7 +640,7 @@ static void MX_GPIO_Init(void)
   LL_GPIO_Init(TTP_CLK_GPIO_Port, &GPIO_InitStruct);
 
   /**/
-  GPIO_InitStruct.Pin = LED_R_Pin|LED_G_Pin|LED_B_Pin;
+  GPIO_InitStruct.Pin = LED_B_Pin|LED_G_Pin|LED_R_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
   GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;

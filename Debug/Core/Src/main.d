@@ -20,7 +20,9 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h \
  D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h \
  D:/STworkspace/PIANO_GETTER/Dev/TTP229/ttp229.h \
- D:/STworkspace/PIANO_GETTER/BSP/UART/uart.h
+ D:/STworkspace/PIANO_GETTER/BSP/UART/uart.h \
+ D:/STworkspace/PIANO_GETTER/Dev/SONG/song.h \
+ D:/STworkspace/PIANO_GETTER/Dev/SONG/song_map.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_rcc.h:
 ../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f1xx.h:
@@ -44,3 +46,5 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h:
 D:/STworkspace/PIANO_GETTER/Dev/TTP229/ttp229.h:
 D:/STworkspace/PIANO_GETTER/BSP/UART/uart.h:
+D:/STworkspace/PIANO_GETTER/Dev/SONG/song.h:
+D:/STworkspace/PIANO_GETTER/Dev/SONG/song_map.h:

@@ -15,5 +15,6 @@
 void UART1_LL_SendChar(uint8_t c);
 void UART1_LL_SendString(const char* str);
 uint8_t UART1_LL_ReceiveChar(void);
+void UART_Transmit(uint8_t *data, uint32_t len);
 
 #endif /* UART_UART_H_ */

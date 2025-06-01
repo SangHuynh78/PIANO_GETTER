@@ -23,3 +23,10 @@ uint8_t UART1_LL_ReceiveChar(void) {
     while (!LL_USART_IsActiveFlag_RXNE(USART1));
     return LL_USART_ReceiveData8(USART1);
 }
+
+void UART_Transmit(uint8_t *data, uint32_t len) {
+    for (uint32_t i = 0; i < len; i++) {
+        while (!LL_USART_IsActiveFlag_TXE(USART1));
+        LL_USART_TransmitData8(USART1, data[i]);
+    }
+}

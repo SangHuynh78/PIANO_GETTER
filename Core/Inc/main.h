@@ -46,11 +46,12 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "gd25q16e.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+extern struct GD25Q16E_Dev flash;
 
 /* USER CODE END ET */
 
@@ -68,24 +69,31 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+void Timer2_10ms_handle(void);
 
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define SPI1_CS_Pin LL_GPIO_PIN_4
-#define SPI1_CS_GPIO_Port GPIOA
+#define FL_CS_Pin LL_GPIO_PIN_4
+#define FL_CS_GPIO_Port GPIOA
+#define FL_SCK_Pin LL_GPIO_PIN_5
+#define FL_SCK_GPIO_Port GPIOA
+#define FL_MISO_Pin LL_GPIO_PIN_6
+#define FL_MISO_GPIO_Port GPIOA
+#define FL_MOSI_Pin LL_GPIO_PIN_7
+#define FL_MOSI_GPIO_Port GPIOA
 #define SW2_Pin LL_GPIO_PIN_12
 #define SW2_GPIO_Port GPIOB
 #define TTP_CLK_Pin LL_GPIO_PIN_13
 #define TTP_CLK_GPIO_Port GPIOB
 #define TTP_SDO_Pin LL_GPIO_PIN_14
 #define TTP_SDO_GPIO_Port GPIOB
-#define LED_R_Pin LL_GPIO_PIN_7
-#define LED_R_GPIO_Port GPIOC
+#define LED_B_Pin LL_GPIO_PIN_7
+#define LED_B_GPIO_Port GPIOC
 #define LED_G_Pin LL_GPIO_PIN_8
 #define LED_G_GPIO_Port GPIOC
-#define LED_B_Pin LL_GPIO_PIN_9
-#define LED_B_GPIO_Port GPIOC
+#define LED_R_Pin LL_GPIO_PIN_9
+#define LED_R_GPIO_Port GPIOC
 #define SW1_Pin LL_GPIO_PIN_15
 #define SW1_GPIO_Port GPIOA
 #define KQ0_Pin LL_GPIO_PIN_3

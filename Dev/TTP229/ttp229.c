@@ -11,18 +11,18 @@
 #define Set_GPIO_OUTPUT() 	LL_GPIO_SetPinMode(TTP_SDO_GPIO_Port, TTP_SDO_Pin, LL_GPIO_MODE_OUTPUT)
 #define Set_GPIO_INPUT() 	LL_GPIO_SetPinMode(TTP_SDO_GPIO_Port, TTP_SDO_Pin, LL_GPIO_MODE_INPUT)
 
-static void TTP229_Delay_us(uint32_t us) {
-    // Set counter to 65535 - us (overflow after 'us' microseconds)
-    LL_TIM_SetCounter(TIM4, 65535 - us);
-    // Clear update flag
-    LL_TIM_ClearFlag_UPDATE(TIM4);
-    // Start the timer
-    LL_TIM_EnableCounter(TIM4);
-    // Wait for overflow (UIF set)
-    while (!LL_TIM_IsActiveFlag_UPDATE(TIM4));
-    // Stop the timer
-    LL_TIM_DisableCounter(TIM4);
-}
+//static void TTP229_Delay_us(uint32_t us) {
+//    // Set counter to 65535 - us (overflow after 'us' microseconds)
+//    LL_TIM_SetCounter(TIM4, 65535 - us);
+//    // Clear update flag
+//    LL_TIM_ClearFlag_UPDATE(TIM4);
+//    // Start the timer
+//    LL_TIM_EnableCounter(TIM4);
+//    // Wait for overflow (UIF set)
+//    while (!LL_TIM_IsActiveFlag_UPDATE(TIM4));
+//    // Stop the timer
+//    LL_TIM_DisableCounter(TIM4);
+//}
 
 uint8_t TTP229_Read_8Keys(void) {
 //    uint8_t key_state = 0;

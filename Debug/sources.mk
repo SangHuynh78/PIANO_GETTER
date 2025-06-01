@@ -26,6 +26,7 @@ BSP/UART \
 Core/Src \
 Core/Startup \
 Dev/FLASH \
+Dev/SONG \
 Dev/TTP229 \
 Drivers/STM32F1xx_HAL_Driver/Src \
 

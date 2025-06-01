@@ -5,3 +5,4 @@
 ../BSP/UART/uart.c:11:6:UART1_LL_SendChar	2
 ../BSP/UART/uart.c:16:6:UART1_LL_SendString	2
 ../BSP/UART/uart.c:22:9:UART1_LL_ReceiveChar	2
+../BSP/UART/uart.c:27:6:UART_Transmit	3

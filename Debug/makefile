@@ -11,6 +11,7 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32F1xx_HAL_Driver/Src/subdir.mk
 -include Dev/TTP229/subdir.mk
+-include Dev/SONG/subdir.mk
 -include Dev/FLASH/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk

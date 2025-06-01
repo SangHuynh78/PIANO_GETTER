@@ -18,7 +18,8 @@ Dev/TTP229/ttp229.o: ../Dev/TTP229/ttp229.c ../Dev/TTP229/ttp229.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_spi.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_tim.h \
  ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_usart.h \
- ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h
+ ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h \
+ D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h
 ../Dev/TTP229/ttp229.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_rcc.h:
@@ -40,3 +41,4 @@ Dev/TTP229/ttp229.o: ../Dev/TTP229/ttp229.c ../Dev/TTP229/ttp229.h \
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_tim.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_usart.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_ll_gpio.h:
+D:/STworkspace/PIANO_GETTER/Dev/FLASH/gd25q16e.h:
