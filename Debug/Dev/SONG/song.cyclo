@@ -1,2 +1,4 @@
 ../Dev/SONG/song.c:16:6:song_erase	3
-../Dev/SONG/song.c:23:6:song_write	3
+../Dev/SONG/song.c:24:6:song_save_index	1
+../Dev/SONG/song.c:29:9:song_read_index	3
+../Dev/SONG/song.c:38:6:song_write	2

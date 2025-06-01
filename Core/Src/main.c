@@ -81,9 +81,10 @@ struct GD25Q16E_Dev flash = {
 	.cs_pin = FL_CS_Pin
 };
 
-#define FLASH_END_ADDR				0x06DFFF
+
+#define FLASH_END_ADDR				0x0FBFFF
 #define UART_CHUNK_SIZE				100
-#define LED_TOGGLE_TICKS			50
+#define LED_TOGGLE_TICKS			20
 #define DEBOUNCE_TICKS				5
 
 static State_t current_state = STATE_IDLE;
@@ -121,7 +122,7 @@ void EraseAllFlash(void) {
         GD25Q16E_EraseSector(&flash, addr);
         // Chớp LED đỏ
         LL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
-        LL_mDelay(50); // Đợi ngắn để chớp LED
+        LL_mDelay(20);
     }
 }
 
@@ -212,16 +213,17 @@ void Timer2_10ms_handle(void) {
                 LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
                 LL_GPIO_SetOutputPin(LED_G_GPIO_Port, LED_G_Pin);
                 LL_GPIO_ResetOutputPin(LED_B_GPIO_Port, LED_B_Pin);
-                if (sw1_hold_time == 1 || sample_count >= SONG_DATA_SIZE_LONG) {
+                if (sw1_hold_time == 1 || sample_count >= SONG_DATA_SIZE) {
                     char name[16];
                     memset(song_name, 0xFF, SONG_NAME_SIZE);
-                    snprintf(name, sizeof(name), "Bai so %lu", song_index + 1);
+                    snprintf(name, sizeof(name), "Bai so %d", song_index + 1);
                     memcpy(song_name, name, strlen(name) + 1);
                     song_write(&flash, song_index);
                     song_index = (song_index + 1) % SONG_COUNT;
+                    song_save_index(&flash, song_index);
                     current_state = STATE_IDLE;
                 } else {
-                    if (sample_count < SONG_DATA_SIZE_LONG) {
+                    if (sample_count < SONG_DATA_SIZE) {
                         song_data[sample_count] = TTP229_Read_8Keys();
                         sample_count++;
                     }
@@ -240,7 +242,6 @@ void Timer2_10ms_handle(void) {
                 } else if (uart_wait_delay >= 50 && sw1_hold_time == 1) {
                 	current_state = STATE_IDLE;
                 }
-
                 break;
 
             case STATE_UART_SENDING:
@@ -253,7 +254,10 @@ void Timer2_10ms_handle(void) {
             case STATE_WAIT_ERASE:
                 erase_wait_delay++;
                 if (erase_wait_delay >= 50 && sw2_state && sw2_hold_time == 1) {
+                	LL_GPIO_ResetOutputPin(LED_G_GPIO_Port, LED_G_Pin);
+                	LL_GPIO_ResetOutputPin(LED_B_GPIO_Port, LED_B_Pin);
                     EraseAllFlash();
+                    song_index = 0;
                     current_state = STATE_IDLE;
                 } else if (erase_wait_delay >= 50 && sw1_state && sw1_hold_time == 1) {
                     current_state = STATE_IDLE;
@@ -301,8 +305,6 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  GD25Q16E_Init(&flash);
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -312,7 +314,9 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
+  // Đọc song_index từ flash
+  GD25Q16E_Init(&flash);
+  song_index = song_read_index(&flash);
 
   /* USER CODE END 2 */
 
