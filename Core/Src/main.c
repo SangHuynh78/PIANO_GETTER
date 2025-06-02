@@ -83,7 +83,7 @@ struct GD25Q16E_Dev flash = {
 
 
 #define FLASH_END_ADDR				0x0FBFFF
-#define UART_CHUNK_SIZE				100
+#define UART_CHUNK_SIZE				128
 #define LED_TOGGLE_TICKS			20
 #define DEBOUNCE_TICKS				5
 
